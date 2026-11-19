@@ -3,6 +3,7 @@
 # No clicks, login automation, or prompts. An unrecoverable disconnect ends the run.
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'aion2-probe-parser.ps1')
+. (Join-Path $PSScriptRoot 'aion2-live-policy.ps1')
 $rootDir = Split-Path -Parent $PSScriptRoot
 $pingExe = Join-Path $PSScriptRoot 'AionPingMeter.exe'
 $probePath = Join-Path $env:APPDATA 'AionPingMeter\probe.txt'
@@ -98,8 +99,7 @@ function Invoke-GameProbe([int]$seconds) {
 function Get-GameState($data) {
     if (-not (Get-Process -Name AION2 -ErrorAction SilentlyContinue)) { return 'ClientExited' }
     if ($null -eq $data) { return 'ProbeFailed' }
-    if ($data.PingEvents -lt 2 -or $data.Observations -lt 2) { return 'NoFreshGamePing' }
-    if ($data.PacketCount -lt 2) { return 'NoGameTraffic' }
+    if (-not (Test-AionLive $data)) { return 'NoFreshGamePing' }
     return 'Live'
 }
 function Get-DiscordSuccess([string]$url) {
@@ -126,7 +126,7 @@ function Make-Row([string]$name,[string]$state,[int]$discord,$data) {
     [pscustomobject]@{
         Config=$name
         Status=$state
-        Eligible=($state -eq 'Live' -and $discord -eq $discordUrls.Count)
+        Eligible=($state -eq 'Live' -and (Test-AionEligible ($state -eq 'Live') $discord $discordUrls.Count $data))
         DiscordOK=$discord
         PingEvents=$events
         Packets=$packetCount
@@ -200,8 +200,7 @@ try {
 
     Write-Host ''
     Write-Host 'Completed automatic ALT checks. Ineligible or disconnected strategies cannot win.' -ForegroundColor Green
-    $ranked = @($rows | Sort-Object @{Expression='Eligible';Descending=$true},
-        @{Expression={if ($null -eq $_.GameP95Ms){[double]::PositiveInfinity}else{$_.GameP95Ms}};Descending=$false})
+    $ranked = @(Get-AionLiveRanking -Rows $rows)
     $ranked | Format-Table Config,Status,Eligible,DiscordOK,PingEvents,GameMeanMs,GameP95Ms -AutoSize | Out-Host
     Write-Host ('Saved: ' + $reportFile) -ForegroundColor Green
     Write-Host 'WARNING: existing TCP sessions can hide handshake-only DPI differences. Re-login behavior is not proven.' -ForegroundColor Yellow
