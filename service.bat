@@ -1240,22 +1240,29 @@ chcp 437 >nul
 cls
 echo Discord + AION 2 Diagnostics
 echo.
-echo   1. Live GAME ping (requires AION2 running and AionPingMeter.exe)
-echo   2. Offline TCP connection checks (NOT gameplay ping)
+echo   1. LIVE game ping - test ALL ALT strategies (AION2 must be running)
+echo   2. LIVE game ping - test ONE active strategy
+echo   3. Offline TCP checks (NOT actual game ping)
 echo   0. Back
 echo.
-set /p aion_test_choice=Select option (0-2):
+set /p aion_test_choice=Select option (0-3):
 if "%aion_test_choice%"=="1" (
-    start "AION 2 live ping" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\aion2-game-ping.ps1"
+    start "AION 2 ALL ALT live test" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\aion2-live-all.ps1"
     pause
     goto menu
 )
 if "%aion_test_choice%"=="2" (
+    start "AION 2 single strategy live test" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\aion2-game-ping.ps1"
+    pause
+    goto menu
+)
+if "%aion_test_choice%"=="3" (
     start "AION 2 TCP tests" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\test aion2.ps1"
     pause
     goto menu
 )
 goto menu
+
 
 :: Get strategy name
 :get_strategy_name
