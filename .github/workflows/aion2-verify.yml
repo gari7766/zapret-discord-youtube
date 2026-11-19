@@ -9,6 +9,7 @@ on:
       - "utils/aion2-checks.ps1"
       - "utils/aion2-probe-parser.ps1"
       - "utils/aion2-live-all.ps1"
+      - "utils/aion2-live-policy.ps1"
       - "utils/aion2-game-ping.ps1"
       - "utils/targets-aion2.txt"
       - "tests/aion2-tests.ps1"
