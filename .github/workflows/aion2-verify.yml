@@ -1,12 +1,15 @@
 name: Verify AION 2 diagnostics
 on:
   push:
-    branches: [ "feature/aion2-discord-alt-tests" ]
+    branches: [ "main", "feature/aion2-discord-alt-tests" ]
   pull_request:
     paths:
       - "service.bat"
       - "utils/test aion2.ps1"
       - "utils/aion2-checks.ps1"
+      - "utils/aion2-probe-parser.ps1"
+      - "utils/aion2-live-all.ps1"
+      - "utils/aion2-game-ping.ps1"
       - "utils/targets-aion2.txt"
       - "tests/aion2-tests.ps1"
       - ".github/workflows/aion2-verify.yml"
