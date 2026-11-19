@@ -28,35 +28,32 @@ GitHub Actions Windows testing is configured, but only a completed green workflo
 ## Safety
 Switching strategies interrupts winws traffic. The script tries to restore previous commands, but forced termination can prevent restoration.
 It does not intentionally change IPSet or Game Filter configuration files. Do not run other winws managers concurrently.
-## Real in-game ping mode (service.bat -> 13 -> 1)
+## Fully automatic live game-ping tests (13 -> 1)
 
-The previous TCP-only mode does NOT measure gameplay latency. For an active
-AION 2 session, option 13 -> 1 measures actual AION 2 game ping packet replies
-using the open-source AionPingMeter --probe interface.
+1. One-time setup: place the real AionPingMeter.exe from
+   https://github.com/ArtemNA/AionPingMeter in utils and install Npcap.
+2. Start zapret with an already working configuration, log into the game world,
+   then launch service.bat as Administrator -> 13 -> 1.
+3. **No further prompts, confirmations or manual ALT switching.**
+4. The test first requires fresh game ping replies on the known-good strategy.
+   If this check fails, nothing is changed.
+5. It snapshots running winws commands and the zapret Windows-service status,
+   automatically cycles every general*.bat, checks Discord and collects new
+   game-protocol ping replies for 45 seconds per strategy.
+6. If a candidate has no fresh game RTT, it automatically restores the
+   known-good route and checks whether the game recovered (up to 3 times).
+   If recovery cannot be proven it **stops safely**; it will not click
+   login screens, enter credentials, or claim missing results are successful.
+7. A finally block restores the original service or standalone winws command
+   and preserves incremental CSV results in utils/test results.
 
-Requirements:
-- Download or build an authentic AionPingMeter.exe from https://github.com/ArtemNA/AionPingMeter
-  (MIT-licensed independent tool) and place it in utils/AionPingMeter.exe.
-- Install Npcap as required by AionPingMeter.
-- Launch AION2.exe, log into the game world and keep it running.
-- Disable the installed zapret service using the normal menu first; the test
-  temporarily cycles general*.bat processes. It restores previously running winws
-  commands when it finishes normally.
-- Option 13 -> 1 tests all ALT strategies, 45 seconds each, and saves a CSV
-  under utils/test results. If a strategy disconnects the game, reconnect before
-  proceeding; that strategy remains ineligible for ranking.
-- Option 13 -> 2 measures just the currently active strategy without changing winws.
-- Option 13 -> 3 runs the older offline TCP-only checks.
+**Important limitations:** Switching DPI settings mid-session does not test
+whether a fresh game login would succeed on the candidate ALT. Desync rules
+can affect only initial packets. If AION 2 needs an interactive re-login after
+a disconnect, unattended completion of all ALT strategies is not possible
+without controlling the game UI. The current implementation deliberately
+aborts and restores the old configuration rather than interacting with that UI.
 
-The real-ping parser counts only increases in the game's ping event counter.
-Repeating a last known RTT in the one-second probe output is not counted as new data.
-No new game RTT events means there is NO measurement; the tester must not invent one.
-
-**Do not claim exact parity with proprietary NotMeter v1.0.362:** its private
-algorithm was not found. The probe implementation is publicly inspectable in
-ArtemNA/AionPingMeter (src/main.rs, src/probe.rs and src/stats.rs).
-The game must be running for real game ping packets to exist.
-
-**Caution:** switching winws while AION 2 is connected can disrupt gameplay;
-do this outside combat and be ready to reconnect. Game packet measurements
-cannot be fully tested in GitHub CI; they require an actual AION 2 session.
+The ping source is the open-source game-packet AionPingMeter probe, **not**
+the unpublished internal algorithm of NotMeter v1.0.362. Windows runtime and
+network E2E must still be verified in an actual game session. 
