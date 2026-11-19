@@ -1248,7 +1248,6 @@ echo.
 set /p aion_test_choice=Select option (0-3):
 if "%aion_test_choice%"=="1" (
     start "AION 2 ALL ALT live test" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\aion2-live-all.ps1"
-    pause
     goto menu
 )
 if "%aion_test_choice%"=="2" (
