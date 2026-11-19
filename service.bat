@@ -1238,11 +1238,23 @@ goto menu
 :run_aion2_tests
 chcp 437 >nul
 cls
-echo Starting Discord + AION 2 ALT tests in a separate PowerShell window...
-echo Original Run Tests and IPSet settings are not modified.
+echo Discord + AION 2 Diagnostics
 echo.
-start "" powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\test aion2.ps1"
-pause
+echo   1. Live GAME ping (requires AION2 running and AionPingMeter.exe)
+echo   2. Offline TCP connection checks (NOT gameplay ping)
+echo   0. Back
+echo.
+set /p aion_test_choice=Select option (0-2):
+if "%aion_test_choice%"=="1" (
+    start "AION 2 live ping" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\aion2-game-ping.ps1"
+    pause
+    goto menu
+)
+if "%aion_test_choice%"=="2" (
+    start "AION 2 TCP tests" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -File "%~dp0utils\test aion2.ps1"
+    pause
+    goto menu
+)
 goto menu
 
 :: Get strategy name
