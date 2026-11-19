@@ -1,6 +1,7 @@
 # Live AION 2 game-ping sampler; requires game running and AionPingMeter.exe in utils.
 # Source implementation: https://github.com/ArtemNA/AionPingMeter (MIT).
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'aion2-probe-parser.ps1')
 $root = Split-Path -Parent $PSScriptRoot
 $exe = Join-Path $PSScriptRoot 'AionPingMeter.exe'
 $probe = Join-Path $env:APPDATA 'AionPingMeter\probe.txt'
@@ -16,19 +17,15 @@ try {
     if (Test-Path $probe) { Remove-Item $probe -Force }
     $p = Start-Process -FilePath $exe -ArgumentList '--probe','45' -PassThru -Wait
     if ($p.ExitCode -ne 0 -or -not (Test-Path $probe)) { throw 'Game ping probe failed; see AionPingMeter diagnostics.' }
-    $values = @()
-    $events = 0
-    foreach ($line in Get-Content $probe) {
-        if ($line -match 'pings=\s*(\d+)') { $events = [int]$matches[1] }
-        if ($line -match 'game=(\d+(?:\.\d+)?)') {
-            $values += [double]::Parse($matches[1], [Globalization.CultureInfo]::InvariantCulture)
-        }
+    $data = Read-AionProbe -Path $probe
+    if ($data.PingEvents -lt 2 -or $data.Observations -lt 2) { throw 'Not enough fresh in-game ping replies; cannot rank ALT.' }
+    $row = [pscustomobject]@{
+        Strategy=$strategy
+        GamePingEvents=$data.PingEvents
+        Observations=$data.Observations
+        MeanMs=$data.MeanMs
+        P95Ms=$data.P95Ms
     }
-    if ($events -lt 2 -or $values.Count -lt 2) { throw 'No two fresh game ping replies were detected; cannot rank ALT.' }
-    $sorted = @($values | Sort-Object)
-    $avg = [Math]::Round(($values | Measure-Object -Average).Average, 1)
-    $p95 = $sorted[[Math]::Max(0, [Math]::Ceiling($sorted.Count * .95)-1)]
-    $row = [pscustomobject]@{ Strategy=$strategy; GamePingEvents=$events; Observations=$values.Count; MeanMs=$avg; P95Ms=$p95 }
     $csv = Join-Path $results 'aion2-game-ping.csv'
     if (Test-Path $csv) { $row | Export-Csv $csv -Append -NoTypeInformation -Encoding UTF8 }
     else { $row | Export-Csv $csv -NoTypeInformation -Encoding UTF8 }
