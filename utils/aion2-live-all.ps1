@@ -15,7 +15,7 @@ $changedNetwork = $false
 $reportFile = $null
 $rows = @()
 $env:NO_UPDATE_CHECK = '1'
-$runMutex = New-Object System.Threading.Mutex($false, 'Local\Aion2ZapretLiveAltTests')
+$runMutex = [System.Threading.Mutex]::new($false, 'Local\Aion2ZapretLiveAltTests')
 $hasMutex = $false
 
 function Get-WinwsSnapshot {
