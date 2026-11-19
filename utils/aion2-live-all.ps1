@@ -15,6 +15,8 @@ $changedNetwork = $false
 $reportFile = $null
 $rows = @()
 $env:NO_UPDATE_CHECK = '1'
+$runMutex = New-Object System.Threading.Mutex($false, 'Local\Aion2ZapretLiveAltTests')
+$hasMutex = $false
 
 function Get-WinwsSnapshot {
     @(Get-CimInstance Win32_Process -Filter "Name='winws.exe'" -ErrorAction Stop |
@@ -136,6 +138,8 @@ function Make-Row([string]$name,[string]$state,[int]$discord,$data) {
 }
 
 try {
+    if (-not $runMutex.WaitOne(0)) { throw 'Another automatic AION 2 ALT test is already running.' }
+    $hasMutex = $true
     $identity = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
     if (-not $identity.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Run service.bat as Administrator.' }
     if (-not (Test-Path -LiteralPath $pingExe)) { throw 'AionPingMeter.exe is missing from utils.' }
@@ -230,5 +234,7 @@ try {
         }
     }
     Save-Rows
+    if ($hasMutex) { $runMutex.ReleaseMutex() }
+    $runMutex.Dispose()
     Write-Host 'Finished. No user interaction was required during the test.'
 }
