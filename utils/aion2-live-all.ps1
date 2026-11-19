@@ -62,6 +62,8 @@ try {
     if ((Read-Host 'Type YES to begin') -ne 'YES') { throw 'Cancelled.' }
     New-Item -ItemType Directory -Path $resultsDir -Force | Out-Null
     $rows = @()
+    $reportPath = Join-Path $resultsDir ('aion2-live-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.csv')
+    $env:NO_UPDATE_CHECK = '1'
     $altered = $true
     foreach ($file in $files) {
         if (-not (Get-Process -Name AION2 -ErrorAction SilentlyContinue)) { throw 'Game client exited.' }
@@ -103,6 +105,7 @@ try {
             GameMeanMs=$avg
             GameP95Ms=$p95
         }
+        $rows | Export-Csv -LiteralPath $reportPath -NoTypeInformation -Encoding UTF8
         Write-Host ("Discord: $discord/4; game ping events: $events; P95: $p95; eligible: $eligible")
         if (-not $eligible -and (Get-Process -Name AION2 -ErrorAction SilentlyContinue)) {
             Write-Host 'No valid game ping response. The game may have disconnected.' -ForegroundColor Yellow
@@ -110,8 +113,7 @@ try {
             [void](Read-Host 'Press Enter to continue')
         }
     }
-    $path = Join-Path $resultsDir ('aion2-live-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.csv')
-    $rows | Export-Csv -Path $path -NoTypeInformation -Encoding UTF8
+    $path = $reportPath
     $rank = @($rows | Sort-Object @{Expression='Eligible';Descending=$true}, @{Expression={if ($null -eq $_.GameP95Ms){[double]::PositiveInfinity}else{$_.GameP95Ms}};Descending=$false})
     $rank | Format-Table -AutoSize | Out-Host
     Write-Host ('Results saved: ' + $path) -ForegroundColor Green
