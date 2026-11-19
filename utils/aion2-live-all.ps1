@@ -185,8 +185,13 @@ try {
             Write-Warning 'No fresh game RTT. Automatically restoring known-good zapret and checking recovery.'
             try {
                 Start-Baseline
-                $recovery = Invoke-GameProbe 45
-                if ((Get-GameState $recovery) -ne 'Live') {
+                $recovered = $false
+                for ($recoveryAttempt = 1; $recoveryAttempt -le 3; $recoveryAttempt++) {
+                    Write-Host ('Recovery check {0}/3...' -f $recoveryAttempt) -ForegroundColor Cyan
+                    $recovery = Invoke-GameProbe 35
+                    if ((Get-GameState $recovery) -eq 'Live') { $recovered = $true; break }
+                }
+                if (-not $recovered) {
                     throw 'Game did not automatically recover on known-good ALT.'
                 }
                 Write-Host 'Automatic recovery succeeded; continuing ALT tests.' -ForegroundColor Green
