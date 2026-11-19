@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $root 'utils\aion2-checks.ps1')
+. (Join-Path $root 'utils\aion2-probe-parser.ps1')
 $checks = 0
 function Assert-True([bool]$condition,[string]$message) {
     if (-not $condition) { throw "FAIL: $message" }
@@ -11,7 +12,7 @@ function Assert-Equal($expected,$actual,[string]$message) {
     $script:checks++
 }
 # Parse every new PowerShell file using the actual PowerShell parser.
-foreach ($file in @('utils\aion2-checks.ps1','utils\test aion2.ps1',$MyInvocation.MyCommand.Path)) {
+foreach ($file in @('utils\aion2-checks.ps1','utils\test aion2.ps1','utils\aion2-probe-parser.ps1','utils\aion2-game-ping.ps1','utils\aion2-live-all.ps1',$MyInvocation.MyCommand.Path)) {
     $filePath = if ([IO.Path]::IsPathRooted($file)) { $file } else { Join-Path $root $file }
     $tokens = $null; $errors = $null
     [void][System.Management.Automation.Language.Parser]::ParseFile($filePath,[ref]$tokens,[ref]$errors)
@@ -69,4 +70,24 @@ Assert-True (Test-Path (Join-Path $root 'utils\targets.txt')) 'original targets 
 $service = [IO.File]::ReadAllText((Join-Path $root 'service.bat'))
 Assert-True ($service.Contains('if "%menu_choice%"=="12" goto run_tests')) 'original menu route remains'
 Assert-True ($service.Contains('if "%menu_choice%"=="13" goto run_aion2_tests')) 'new menu route present'
+# Replay test: probe reports the same last ping for several seconds.
+# Do not count repeated snapshots as separate in-game RTT events.
+$tmp = [IO.Path]::GetTempFileName()
+try {
+    [IO.File]::WriteAllLines($tmp, @(
+        '  1s packets=10 pings=0 game=- tcpMin2s=40',
+        '  2s packets=20 pings=1 game=90.0 tcpMin2s=40',
+        '  3s packets=30 pings=1 game=90.0 tcpMin2s=40',
+        '  4s packets=40 pings=1 game=90.0 tcpMin2s=40',
+        '  5s packets=50 pings=2 game=110.0 tcpMin2s=40'
+    ))
+    $probe = Read-AionProbe -Path $tmp
+    Assert-Equal 2 $probe.PingEvents 'two actual in-game ping events'
+    Assert-Equal 2 $probe.Observations 'stale snapshots discarded'
+    Assert-Equal 100 $probe.MeanMs 'event-based game RTT average'
+    Assert-Equal 110 $probe.P95Ms 'event-based P95'
+    Assert-Equal 50 $probe.PacketCount 'last packet count'
+} finally {
+    Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+}
 Write-Host "PASS: $checks checks (including 1000 randomized CIDR properties)." -ForegroundColor Green
