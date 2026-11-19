@@ -28,3 +28,35 @@ GitHub Actions Windows testing is configured, but only a completed green workflo
 ## Safety
 Switching strategies interrupts winws traffic. The script tries to restore previous commands, but forced termination can prevent restoration.
 It does not intentionally change IPSet or Game Filter configuration files. Do not run other winws managers concurrently.
+## Real in-game ping mode (service.bat -> 13 -> 1)
+
+The previous TCP-only mode does NOT measure gameplay latency. For an active
+AION 2 session, option 13 -> 1 measures actual AION 2 game ping packet replies
+using the open-source AionPingMeter --probe interface.
+
+Requirements:
+- Download or build an authentic AionPingMeter.exe from https://github.com/ArtemNA/AionPingMeter
+  (MIT-licensed independent tool) and place it in utils/AionPingMeter.exe.
+- Install Npcap as required by AionPingMeter.
+- Launch AION2.exe, log into the game world and keep it running.
+- Disable the installed zapret service using the normal menu first; the test
+  temporarily cycles general*.bat processes. It restores previously running winws
+  commands when it finishes normally.
+- Option 13 -> 1 tests all ALT strategies, 45 seconds each, and saves a CSV
+  under utils/test results. If a strategy disconnects the game, reconnect before
+  proceeding; that strategy remains ineligible for ranking.
+- Option 13 -> 2 measures just the currently active strategy without changing winws.
+- Option 13 -> 3 runs the older offline TCP-only checks.
+
+The real-ping parser counts only increases in the game's ping event counter.
+Repeating a last known RTT in the one-second probe output is not counted as new data.
+No new game RTT events means there is NO measurement; the tester must not invent one.
+
+**Do not claim exact parity with proprietary NotMeter v1.0.362:** its private
+algorithm was not found. The probe implementation is publicly inspectable in
+ArtemNA/AionPingMeter (src/main.rs, src/probe.rs and src/stats.rs).
+The game must be running for real game ping packets to exist.
+
+**Caution:** switching winws while AION 2 is connected can disrupt gameplay;
+do this outside combat and be ready to reconnect. Game packet measurements
+cannot be fully tested in GitHub CI; they require an actual AION 2 session.
