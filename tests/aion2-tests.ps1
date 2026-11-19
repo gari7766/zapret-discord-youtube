@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 . (Join-Path $root 'utils\aion2-checks.ps1')
 . (Join-Path $root 'utils\aion2-probe-parser.ps1')
+. (Join-Path $root 'utils\aion2-live-policy.ps1')
 $checks = 0
 function Assert-True([bool]$condition,[string]$message) {
     if (-not $condition) { throw "FAIL: $message" }
@@ -12,7 +13,7 @@ function Assert-Equal($expected,$actual,[string]$message) {
     $script:checks++
 }
 # Parse every new PowerShell file using the actual PowerShell parser.
-foreach ($file in @('utils\aion2-checks.ps1','utils\test aion2.ps1','utils\aion2-probe-parser.ps1','utils\aion2-game-ping.ps1','utils\aion2-live-all.ps1',$MyInvocation.MyCommand.Path)) {
+foreach ($file in @('utils\aion2-checks.ps1','utils\test aion2.ps1','utils\aion2-probe-parser.ps1','utils\aion2-game-ping.ps1','utils\aion2-live-all.ps1','utils\aion2-live-policy.ps1',$MyInvocation.MyCommand.Path)) {
     $filePath = if ([IO.Path]::IsPathRooted($file)) { $file } else { Join-Path $root $file }
     $tokens = $null; $errors = $null
     [void][System.Management.Automation.Language.Parser]::ParseFile($filePath,[ref]$tokens,[ref]$errors)
@@ -90,4 +91,36 @@ try {
 } finally {
     Remove-Item $tmp -Force -ErrorAction SilentlyContinue
 }
+# Live-mode verification: success requires actual fresh game replies plus packet flow.
+$healthy = [pscustomobject]@{PingEvents=3;Observations=3;PacketCount=400}
+$dead = [pscustomobject]@{PingEvents=0;Observations=0;PacketCount=400}
+$stale = [pscustomobject]@{PingEvents=1;Observations=1;PacketCount=400}
+$noTraffic = [pscustomobject]@{PingEvents=2;Observations=2;PacketCount=0}
+Assert-True (Test-AionLive $healthy) 'fresh game replies accepted'
+Assert-True (-not (Test-AionLive $dead)) 'disconnected game rejected even with TCP packets'
+Assert-True (-not (Test-AionLive $stale)) 'single game ping rejected'
+Assert-True (-not (Test-AionLive $noTraffic)) 'no game traffic rejected'
+Assert-True (-not (Test-AionLive $null)) 'failed probe rejected'
+Assert-True (Test-AionEligible $true 4 4 $healthy) 'all services and live game accepted'
+Assert-True (-not (Test-AionEligible $true 3 4 $healthy)) 'Discord partial failure rejected'
+Assert-True (-not (Test-AionEligible $false 4 4 $healthy)) 'winws startup failure rejected'
+Assert-True (-not (Test-AionEligible $true 4 4 $dead)) 'game disconnect rejected'
+$liveRows = @(
+    [pscustomobject]@{ Config='broken-fast';Eligible=$false;GameP95Ms=1;GameMeanMs=1 },
+    [pscustomobject]@{ Config='good-slow';Eligible=$true;GameP95Ms=120;GameMeanMs=100 },
+    [pscustomobject]@{ Config='good-fast';Eligible=$true;GameP95Ms=80;GameMeanMs=70 },
+    [pscustomobject]@{ Config='unavailable';Eligible=$false;GameP95Ms=$null;GameMeanMs=$null }
+)
+$liveRank = @(Get-AionLiveRanking -Rows $liveRows)
+Assert-Equal 'good-fast' $liveRank[0].Config 'fastest eligible strategy first'
+Assert-Equal 'good-slow' $liveRank[1].Config 'slower eligible strategy second'
+Assert-Equal 'broken-fast' $liveRank[2].Config 'ineligible strategies never outrank eligible'
+Assert-Equal 'unavailable' $liveRank[3].Config 'missing data ranks last'
+$liveSource = [IO.File]::ReadAllText((Join-Path $root 'utils\aion2-live-all.ps1'))
+Assert-True (-not $liveSource.Contains('Read-Host')) 'automatic live test has no interactive prompts'
+Assert-True ($liveSource.Contains('Start-Baseline')) 'automatic known-good recovery exists'
+Assert-True ($liveSource.Contains('Get-WinwsSnapshot')) 'original process snapshot exists'
+Assert-True ($liveSource.Contains('finally')) 'cleanup in finally block exists'
+Assert-True ($liveSource.Contains('Save-Rows')) 'partial results checkpoint exists'
+
 Write-Host "PASS: $checks checks (including 1000 randomized CIDR properties)." -ForegroundColor Green
